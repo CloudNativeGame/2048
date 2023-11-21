@@ -1,0 +1,48 @@
+apiVersion: game.kruise.io/v1alpha1
+kind: GameServerSet
+metadata:
+  name: gss-2048
+  namespace: default
+spec:
+  replicas: {{ .Values.replicaCount }}
+  updateStrategy:
+    rollingUpdate:
+      podUpdatePolicy: InPlaceIfPossible
+  network:
+    networkType: AlibabaCloud-SLB
+    networkConf:
+      - name: SlbIds
+        value: {{ .Values.network.slbIds }}
+      - name: PortProtocols
+        value: 80/TCP
+  gameServerTemplate:
+    spec:
+      containers:
+        - image: "{{ .Values.image.repository }}:{{ .Values.image.mainTag }}"
+          name: app-2048
+          resources:
+            requests:
+              cpu: 50m
+              memory: 1024Mi
+          volumeMounts:
+            - name: shared-dir
+              mountPath: /var/www/html/js
+        - image: "{{ .Values.image.repository }}:{{ .Values.image.sidecarTag }}"
+          name: sidecar
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1024Mi
+            limits:
+              cpu: 200m
+              memory: 1024Mi
+          args:
+            - bash
+            - -c
+            - rsync -aP /app/js/* /app/scripts/ && while true; do echo 11;sleep 2; done
+          volumeMounts:
+            - name: shared-dir
+              mountPath: /app/scripts
+      volumes:
+        - name: shared-dir
+          emptyDir: {}
